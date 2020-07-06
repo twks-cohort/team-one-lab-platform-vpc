@@ -2,7 +2,7 @@
 require 'awspec'
 require 'json'
 
-tfvars = JSON.parse(File.read('./' + ENV['ENV'] + '.auto.tfvars.json'))
+tfvars = JSON.parse(File.read('./' + ENV['TEST_ENV'] + '.auto.tfvars.json'))
 
 describe vpc(tfvars["cluster_name"] + '-vpc') do
   it { should exist }
