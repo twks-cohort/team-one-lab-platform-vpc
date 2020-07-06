@@ -1,0 +1,102 @@
+---
+version: 2.1
+
+orbs:
+  terraform: feedyard/terraform@dev:latest
+
+on-push-master: &on-push-master
+  branches:
+    only: /master/
+  tags:
+    ignore: /.*/
+
+on-tag-master: &on-tag-master
+  branches:
+    ignore: /.*/
+  tags:
+    only: /.*/
+
+workflows:
+  version: 2
+  lab-platform-vpc-pipeline:
+
+    jobs:
+      - terraform/plan:
+          name: sandbox-change-plan
+          context: ZTW
+          shell: secrethub run -- /bin/sh -eo pipefail
+          workspace: sandbox
+          before-terraform:
+            - run:
+                name: template environmental configuration and credentials
+                command: |
+                  secrethub inject -i tpl/terraformrc.tpl -o ~/.terraformrc
+                  secrethub inject -i tpl/sandbox.auto.tfvars.json.tpl -o sandbox.auto.tfvars.json
+          filters: *on-push-master
+
+      - approve-sandbox-changes:
+          type: approval
+          requires:
+            - sandbox-change-plan
+          filters: *on-push-master
+
+      - terraform/apply:
+          name: sandbox-change-apply
+          context: ZTW
+          shell: secrethub run -- /bin/sh -eo pipefail
+          workspace: sandbox
+          before-terraform:
+            - run:
+                name: setup credentials from secrets
+                command: |
+                  secrethub inject -i tpl/terraformrc.tpl -o ~/.terraformrc
+                  secrethub inject -i tpl/sandbox.auto.tfvars.json.tpl -o sandbox.auto.tfvars.json
+                  secrethub inject -i tpl/nonprod.test.sh.tpl -o nonprod.test.sh
+          after-terraform:
+            - run:
+                name: test sandbox account changes
+                command: secrethub run -- bash nonprod.test.sh
+          requires:
+            - approve-sandbox-changes
+          filters: *on-push-master
+
+      # git tag = plan prod-role changes
+      - terraform/plan:
+          name: prod-change-plan
+          context: ZTW
+          shell: secrethub run --env-file secrethub.prod.env -- /bin/sh -eo pipefail
+          workspace: prod
+          working-directory: roles
+          before-terraform:
+            - run:
+                name: setup credentials from secrets
+                command: |
+                  secrethub inject -i tpl/subaccount.auto.tfvars.json.tpl -o roles/subaccount.auto.tfvars.json
+                  secrethub inject -i tpl/terraformrc.tpl -o ~/.terraformrc
+          filters: *on-tag-master
+
+      - approve-prod-changes:
+          type: approval
+          requires:
+            - prod-change-plan
+          filters: *on-tag-master
+
+      - terraform/apply:
+          name: prod-change-apply
+          context: ZTW
+          shell: secrethub run --env-file secrethub.prod.env -- /bin/sh -eo pipefail
+          workspace: nonprod
+          working-directory: roles
+          before-terraform:
+            - run:
+                name: setup credentials from secrets
+                command: |
+                  secrethub inject -i tpl/subaccount.auto.tfvars.json.tpl -o roles/subaccount.auto.tfvars.json
+                  secrethub inject -i tpl/terraformrc.tpl -o ~/.terraformrc
+          after-terraform:
+            - run:
+                name: test nonprod account changes
+                command: secrethub run --env-file secrethub.prod.env -- bats roles/test
+          requires:
+            - approve-prod-changes
+          filters: *on-tag-master
