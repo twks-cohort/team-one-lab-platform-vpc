@@ -1,6 +1,5 @@
 # lab-platform-vpc
 
-
 | vpc      | us-east-1       | us-east-1a      |   us-east-1b   |  us-east-1c    | 
 |----------|:---------------:|:------------ --:|:--------------:|---------------:|
 | sandbox  | 10.50.0.0/16    |                 |                |                |
@@ -29,3 +28,4 @@
 | public  | local, igw                     |
 | private | local, natgw-public-us-east-1a |
 | intra   | local                          |
+
