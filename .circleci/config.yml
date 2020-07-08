@@ -55,6 +55,8 @@ workflows:
           after-terraform:
             - run:
                 name: test sandbox account changes
+                environment:
+                  TEST_ENV: sandbox
                 command: secrethub run -- bash nonprod.test.sh
           requires:
             - approve-sandbox-changes
