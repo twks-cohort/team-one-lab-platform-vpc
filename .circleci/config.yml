@@ -57,7 +57,7 @@ workflows:
                 name: test sandbox account changes
                 environment:
                   TEST_ENV: sandbox
-                command: secrethub run -- bash nonprod.test.sh
+                command: secrethub run -- bash nonprod.test.sh sandbox
           requires:
             - approve-sandbox-changes
           filters: *on-push-master
