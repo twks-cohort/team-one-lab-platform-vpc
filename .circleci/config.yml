@@ -21,23 +21,18 @@ workflows:
   lab-platform-vpc-pipeline:
 
     jobs:
-      - plan-cluster-vpc:
+      - terraform/plan:
           name: sandbox-change-plan
+          context: ZTW
+          shell: secrethub run -- /bin/sh -eo pipefail
           workspace: sandbox
+          before-terraform:
+            - run:
+                name: template environmental configuration and credentials
+                command: |
+                  secrethub inject -i tpl/terraformrc.tpl -o ~/.terraformrc
+                  secrethub inject -i tpl/sandbox.auto.tfvars.json.tpl -o sandbox.auto.tfvars.json
           filters: *on-push-master
-
-      # - terraform/plan:
-      #     name: sandbox-change-plan
-      #     context: ZTW
-      #     shell: secrethub run -- /bin/sh -eo pipefail
-      #     workspace: sandbox
-      #     before-terraform:
-      #       - run:
-      #           name: template environmental configuration and credentials
-      #           command: |
-      #             secrethub inject -i tpl/terraformrc.tpl -o ~/.terraformrc
-      #             secrethub inject -i tpl/sandbox.auto.tfvars.json.tpl -o sandbox.auto.tfvars.json
-      #     filters: *on-push-master
 
       - approve-sandbox-changes:
           type: approval
@@ -45,100 +40,66 @@ workflows:
             - sandbox-change-plan
           filters: *on-push-master
 
-      - apply-cluster-vpc:
+      - terraform/apply:
           name: sandbox-change-apply
+          context: ZTW
+          shell: secrethub run -- /bin/sh -eo pipefail
           workspace: sandbox
-          account: nonprod
+          before-terraform:
+            - run:
+                name: setup credentials from secrets
+                command: |
+                  secrethub inject -i tpl/terraformrc.tpl -o ~/.terraformrc
+                  secrethub inject -i tpl/sandbox.auto.tfvars.json.tpl -o sandbox.auto.tfvars.json
+                  secrethub inject -i tpl/nonprod.test.sh.tpl -o nonprod.test.sh
+          after-terraform:
+            - run:
+                name: test sandbox account changes
+                environment:
+                  TEST_ENV: sandbox
+                command: secrethub run -- bash nonprod.test.sh sandbox
+          requires:
+            - approve-sandbox-changes
           filters: *on-push-master
-
-      # - terraform/apply:
-      #     name: sandbox-change-apply
-      #     context: ZTW
-      #     shell: secrethub run -- /bin/sh -eo pipefail
-      #     workspace: sandbox
-      #     before-terraform:
-      #       - run:
-      #           name: setup credentials from secrets
-      #           command: |
-      #             secrethub inject -i tpl/terraformrc.tpl -o ~/.terraformrc
-      #             secrethub inject -i tpl/sandbox.auto.tfvars.json.tpl -o sandbox.auto.tfvars.json
-      #             secrethub inject -i tpl/nonprod.test.sh.tpl -o nonprod.test.sh
-      #     after-terraform:
-      #       - run:
-      #           name: test sandbox account changes
-      #           environment:
-      #             TEST_ENV: sandbox
-      #           command: secrethub run -- bash nonprod.test.sh sandbox
-      #     requires:
-      #       - approve-sandbox-changes
-      #     filters: *on-push-master
 
       # git tag = plan prod-role changes
       - terraform/plan:
-          name: prod-change-plan
+          name: preview-change-plan
           context: ZTW
-          shell: secrethub run --env-file secrethub.prod.env -- /bin/sh -eo pipefail
-          workspace: prod
-          working-directory: roles
+          shell: secrethub run -- /bin/sh -eo pipefail
+          workspace: preview
           before-terraform:
             - run:
-                name: setup credentials from secrets
+                name: template environmental configuration and credentials
                 command: |
-                  secrethub inject -i tpl/subaccount.auto.tfvars.json.tpl -o roles/subaccount.auto.tfvars.json
                   secrethub inject -i tpl/terraformrc.tpl -o ~/.terraformrc
+                  secrethub inject -i tpl/preview.auto.tfvars.json.tpl -o preview.auto.tfvars.json
           filters: *on-tag-master
 
+      - approve-preview-changes:
+          type: approval
+          requires:
+            - preview-change-plan
+          filters: *on-tag-master
 
-jobs:
-  
-  plan-cluster-vpc:
-    
-    parameters:
-      workspace:
-        description: terraform workspace (infrastructure environment) name
-        type: string
-        default: ""
-
-    steps:
-      - terraform/plan:
-          context: ZTW
-          shell: secrethub run -- /bin/sh -eo pipefail
-          workspace: << parameters.workspace >>
-          before-terraform:
-            - run:
-                name: template plan << parameters.workspace >>
-                command: |
-                  secrethub inject -i tpl/terraformrc.tpl -o ~/.terraformrc
-                  secrethub inject -i tpl/<< parameters.workspace >>.auto.tfvars.json.tpl -o << parameters.workspace >>.auto.tfvars.json
-
-  apply-cluster-vpc:
-
-    parameters:
-      workspace:
-        description: terraform workspace (infrastructure environment) name
-        type: string
-        default: ""
-      
-      account:
-        description: aws account target
-        type: string
-        default: ""
-
-    steps:
       - terraform/apply:
+          name: preview-change-apply
           context: ZTW
           shell: secrethub run -- /bin/sh -eo pipefail
-          workspace: << parameters.workspace >>
+          workspace: preview
           before-terraform:
             - run:
                 name: setup credentials from secrets
                 command: |
                   secrethub inject -i tpl/terraformrc.tpl -o ~/.terraformrc
-                  secrethub inject -i tpl/<< parameters.workspace >>.auto.tfvars.json.tpl -o << parameters.workspace >>.auto.tfvars.json
-                  secrethub inject -i tpl/<< parameters.account >>.test.sh.tpl -o << parameters.account >>.test.sh
+                  secrethub inject -i tpl/preview.auto.tfvars.json.tpl -o preview.auto.tfvars.json
+                  secrethub inject -i tpl/nonprod.test.sh.tpl -o nonprod.test.sh
           after-terraform:
             - run:
-                name: test changes
+                name: test preview account changes
                 environment:
-                  TEST_ENV: << parameters.workspace >>
-                command: secrethub run -- bash << parameters.account >>.test.sh << parameters.workspace >>
+                  TEST_ENV: preview
+                command: secrethub run -- bash nonprod.test.sh preview
+          requires:
+            - approve-preview-changes
+          filters: *on-tag-master
