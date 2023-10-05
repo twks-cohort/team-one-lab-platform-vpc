@@ -1,5 +1,5 @@
 {
-  "cluster_name": "nonprod-us-east-2",
+  "cluster_name": "q3-nonprod-us-east-2",
   "aws_region": "us-east-2",
   "assume_role": "DPSPlatformVPCRole",
   "account_id": "{{ op://cohorts/teamone-aws/aws-account-id }}",

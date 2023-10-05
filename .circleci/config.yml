@@ -92,11 +92,11 @@ workflows:
           name: nonprod-us-east-2 change plan
           context: << pipeline.parameters.context >>
           shell: op run --env-file=op.nonprod.env -- /bin/bash -eo pipefail
-          workspace: nonprod-us-east-2
+          workspace: q3-nonprod-us-east-2
           terraform-version: << pipeline.parameters.terraform-version >>
           before-terraform:
             - set-environment:
-                cluster: nonprod-us-east-2
+                cluster: q3-nonprod-us-east-2
                 source-env: op.nonprod.env
           filters: *on-push-main
 
@@ -110,11 +110,11 @@ workflows:
           name: apply nonprod-us-east-2 changes
           context: << pipeline.parameters.context >>
           shell: op run --env-file=op.nonprod.env -- /bin/bash -eo pipefail
-          workspace: nonprod-us-east-2
+          workspace: q3-nonprod-us-east-2
           terraform-version: << pipeline.parameters.terraform-version >>
           before-terraform:
             - set-environment:
-                cluster: nonprod-us-east-2
+                cluster: q3-nonprod-us-east-2
                 source-env: op.nonprod.env
           requires:
             - approve nonprod-us-east-2 changes
@@ -123,7 +123,7 @@ workflows:
       - validate-vpc:
           name: test nonprod-us-east-2 vpc configuration
           context: << pipeline.parameters.context >>
-          cluster: nonprod-us-east-2
+          cluster: q3-nonprod-us-east-2
           source-env: op.nonprod.env
           requires:
             - apply nonprod-us-east-2 changes
@@ -142,4 +142,4 @@ workflows:
           name: nightly nonprod-us-east-2 vpc validation
           context: << pipeline.parameters.context >>
           source-env: op.nonprod.env
-          cluster: nonprod-us-east-2
+          cluster: q3-nonprod-us-east-2
