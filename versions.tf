@@ -8,9 +8,9 @@ terraform {
 
   backend "remote" {
     hostname     = "app.terraform.io"
-    organization = "twdps"
+    organization = "twks-cohort"
     workspaces {
-      prefix = "lab-platform-vpc-"
+      prefix = "tone-lab-platform-vpc-"
     }
   }
 }
